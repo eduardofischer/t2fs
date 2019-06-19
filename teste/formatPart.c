@@ -3,7 +3,7 @@
 #include "../include/fs_aux.h"
 
 int main(int argc, char const *argv[]){
-    if(format2(4) != 0){
+    if(format2(1) != 0){
         printf("Error at format2\n");
         return -1;
     }

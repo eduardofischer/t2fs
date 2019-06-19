@@ -6,43 +6,48 @@
 
 
 // Hash Function
-unsigned int hash(const char *str, int tablesize){
+int hash(const char *str, int tablesize){
     int value = 0;
 
     int i;
     for(i=0; i< strlen(str); i++)
-        value += toupper(str[i]) - 'A';
+        value += str[i];
 
     return value % tablesize;
 }
 
-DIRENT2* findHashEntry(DIRENT2 *table[], const char *key){
-    unsigned int index = hash(key, DIR_HASHTABLE_SIZE);
-    DIRENT2 *it = table[index];
-    DIRENT2 disk;
+DIRENT2* findHashEntry(DIRENT2 *table, const char *key){
+    int index = hash(key, superBlock.hashTableSize);
+    DIRENT2 *it = malloc(sizeof(DIRENT2));
+    memcpy(it, &(table[index]), sizeof(DIRENT2));
 
-    // Try to find if a matching key in the list exists
-    do{
+    if(it->fileType == (BYTE)INVALID_PTR)
+        return NULL; 
+
+    if(strcmp(it->name, key) == 0)
+        return it;
+
+    while(it->next != (BYTE)INVALID_PTR) {
+        DIRENT2 next = readDirEnt(it->next);
+        memcpy(it, &next, sizeof(DIRENT2));
         if(strcmp(it->name, key) == 0)
-            return it;
-        disk = readDirEnt(it->next);
-        it = &disk;
-    } while(it->next != INVALID_PTR);
+            return it;    
+    };
 
-    return INVALID_PTR;
+    return NULL;
 }
 
-int insertHashEntry(DIRENT2 *table[], DIRENT2 *file){
-    if(findEntry(table, file->name) == INVALID_PTR) {
-        // Find the desired linked list
-        unsigned int index = hash(file->name, DIR_HASHTABLE_SIZE);
-        DIRENT2 *newEnt = malloc(sizeof(DIRENT2*));
-
-        memcpy(newEnt, file, sizeof(DIRENT2));
-
-        // Add the new key and link to the front of the list
-        newEnt->next = table[index];
-        table[index] = newEnt;
+int insertHashEntry(DIRENT2 *table, DIRENT2 *file){
+    DIRENT2 *hashTable = table;
+    if(findHashEntry(hashTable, file->name) == NULL) {
+        int index = hash(file->name, superBlock.hashTableSize);
+        if(table[index].fileType == (BYTE)INVALID_PTR){
+            file->next = (BYTE)INVALID_PTR;
+            table[index] = *file;
+        }else{
+            file->next = table[index].next;
+            table[index].next = writeDirEnt(file);
+        }
     } else{
         return -1; // Entrada já existe na tabela
     }

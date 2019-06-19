@@ -51,10 +51,47 @@ int createSuperblock(int sectorsPerBlock){
     newSB.dataBlocksAreaSize = getPartitionSize(WORKING_PART) - 1 - newSB.fatSize - newSB.entDirAreaSize;
     newSB.numberOfDataBlocks = newSB.dataBlocksAreaSize / newSB.sectorsPerBlock;
 
+    newSB.hashTableSize = sectorsPerBlock * SECTOR_SIZE / sizeof(DIRENT2);
+
+    printf("Hash Table Size: %d", newSB.hashTableSize);
+
+    // Diretório corrente padrão
+    newSB.cwdHandle = 0;
+    newSB.cwdPath = malloc(2);
+    strcpy(newSB.cwdPath, "/");
+
     BYTE buffer[SECTOR_SIZE] = {0};
     memcpy(buffer, &newSB, sizeof(SUPERBLOCK));
 
     return write_sector(diskMBR.partition[WORKING_PART].startAddress, buffer);
+}
+
+int initOpenStructs(){
+    int f, d;
+    int nOpenFiles = sizeof(openFiles) / sizeof(OFILE);
+    int nOpenDirs = sizeof(openDirs) / sizeof(ODIR);
+
+    OFILE invalidFile;
+    invalidFile.pointer = INVALID_PTR;
+    invalidFile.firstBlock = INVALID_PTR;
+    invalidFile.block = INVALID_PTR;
+
+    ODIR invalidDir;
+    invalidDir.readCount = INVALID_PTR;
+    invalidDir.block = INVALID_PTR;
+
+    for(f=0; f<nOpenFiles; f++)
+        openFiles[f] = invalidFile;
+
+    for(d=1; d<nOpenDirs; d++)
+        openDirs[d] = invalidDir;
+
+    ODIR root;
+    root.readCount = 0;
+    root.block = 0;
+    openDirs[0] = root;
+
+    return 0;
 }
 
 int initFS(){
@@ -66,6 +103,8 @@ int initFS(){
         return -1;
 
     memcpy(&superBlock, buffer, sizeof(SUPERBLOCK));
+
+    initOpenStructs();
 
     hasInit = 1;
 
@@ -129,7 +168,6 @@ WORD getFATFreeAddr(){
     BYTE *buffer = malloc(SECTOR_SIZE);
     int i=0, j;
     int sector = superBlock.fatStart; 
-    int entriesPerSector = SECTOR_SIZE/sizeof(DWORD);
 
     while(i < superBlock.numberOfDataBlocks){
         j=0;
@@ -252,16 +290,17 @@ WORD writeDirEnt(DIRENT2 *ent){
 int writeData(WORD block, void *data, int size){
     int firstSector = superBlock.dataBlocksAreaStart + block / superBlock.sectorsPerBlock;
     BYTE *buffer = malloc(SECTOR_SIZE * superBlock.sectorsPerBlock);
-    memset(buffer, 0, SECTOR_SIZE * superBlock.sectorsPerBlock);
+    memset(buffer, -1, SECTOR_SIZE * superBlock.sectorsPerBlock);
 
     memcpy(buffer, data, size);
 
     int i;
-    for(i=0; i<superBlock.sectorsPerBlock; i++){
+    for(i=0; i<superBlock.sectorsPerBlock; i++)
         if(write_sector(firstSector + i, buffer + SECTOR_SIZE*i) != 0)
-            return -1;
-        setFAT(block, FAT_LAST_BLOCK_CHAR);
-    }
+            return -1;      
+    
+
+    setFAT(block, FAT_LAST_BLOCK_CHAR);
 
     free(buffer);
 
@@ -274,35 +313,133 @@ void* readData(WORD block, int size){
     BYTE *data = malloc(size);
 
     int i;
-    for(i=0; i<superBlock.sectorsPerBlock; i++){
+    for(i=0; i<superBlock.sectorsPerBlock; i++)
         if(read_sector(firstSector + i, buffer + SECTOR_SIZE*i) != 0)
-            return -1;
-    }
-
+            return NULL;
+    
     memcpy(data, buffer, size);
 
     free(buffer);
 
-    return data;
+    return (void*)data;
+}
+
+DIRENT2* createDirTable(){
+    DIRENT2 *table = malloc(superBlock.hashTableSize*sizeof(DIRENT2));
+    int i;
+    DIRENT2 empty;
+    memset(empty.name, ' ', MAX_FILE_NAME_SIZE+1);
+    empty.fileType = INVALID_PTR;
+    empty.fileSize = INVALID_PTR;
+    empty.firstBlock = INVALID_PTR;
+    empty.next = INVALID_PTR;
+    for(i=0; i<superBlock.hashTableSize; i++){
+        table[i] = empty;
+    }
+
+    return table;
 }
 
 int createRootDir(){
-    DIRENT2 table[DIR_HASHTABLE_SIZE];
-    DIRENT2 this;
+    DIRENT2 *table = createDirTable();
+    DIRENT2 *this = malloc(sizeof(DIRENT2));
     
     // Entrada .
-    strcpy((char *)&this.name, "/");
-    this.fileType = DIRECTORY_FT;
-    this.fileSize = sizeof(table);
-    this.firstBlock = 0;
-    this.next = INVALID_PTR;
+    strcpy((char *)this, ".");
+    this->fileType = DIRECTORY_FT;
+    this->fileSize = sizeof(DIRENT2) * superBlock.hashTableSize;
+    this->firstBlock = 0;
+    this->next = INVALID_PTR;
 
-    table[0] = this;
+    insertHashEntry(table, this);
 
-    if(writeData(0, &table, sizeof(table)) != 0)
+    if(writeData(0, table, sizeof(DIRENT2) * superBlock.hashTableSize) != 0)
         return -1;
 
     return 0;
+}
+
+char** decodePath(char* path){
+    char** pathArray = malloc(2*sizeof(char*));
+    char *token;
+    const char s[2] = "/";
+    int i=1;
+
+    pathArray[0] = malloc(2*sizeof(char*));
+    if(path[0] == '/')
+        strcpy(pathArray[0], "/");
+    else if(path[0] == '.' && path[1] == '.' && path[2] == '/')
+        i=0;
+    else if(path[0] == '.' && path[1] == '/')
+        i=0;
+    else
+        strcpy(pathArray[0], ".");
+
+    token = strtok(path, s);
+
+    while(token != NULL){
+        pathArray = realloc(pathArray, (i+1)*sizeof(char*));
+        pathArray[i] = malloc(sizeof(token));
+        strcpy(pathArray[i], token);
+        token = strtok(NULL, (char *)"/");
+        i++;
+    }
+    
+    return pathArray;
+}
+
+FILE2 getFreeFileHandle(){
+    int i;
+    int nHandles = sizeof(openFiles) / sizeof(OFILE);
+
+    for(i=0; i<nHandles; i++)
+        if(openFiles[i].pointer == INVALID_PTR)
+            return i;
+
+    return -1;
+}
+
+DIRENT2 getCWDDirEnt(){
+    BYTE cwdHandle = superBlock.cwdHandle;
+    DIRENT2 *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENT2) * superBlock.hashTableSize);
+
+    return *dirTable;
+}
+
+char* getCWD(){
+    return superBlock.cwdPath;
+}
+
+FILE2 createFile(char *name){
+    OFILE newFile;
+    WORD addr = getFATFreeAddr();
+    FILE2 handle = getFreeFileHandle();
+    BYTE cwdHandle = superBlock.cwdHandle;
+    DIRENT2 *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENT2) * superBlock.hashTableSize);
+
+    if((strcmp(name, "/") | strcmp(name, ".") | strcmp(name, "..")) == 0)
+        return -1;
+
+    newFile.pointer = 0;
+    newFile.block = addr;
+    newFile.firstBlock = addr;
+
+    DIRENT2 *dirEntry = malloc(sizeof(DIRENT2));
+    strcpy((char*)&(dirEntry->name), name);
+    dirEntry->fileType = REGULAR_FT;
+    dirEntry->fileSize = 0;
+    dirEntry->firstBlock = addr;
+    dirEntry->next = INVALID_PTR;
+
+    if(insertHashEntry(dirTable, dirEntry) != 0)
+        return -2; // Caso o arquivo já exista [FALTA IMPLEMENTAR]
+
+    if(writeData(openDirs[cwdHandle].block, dirTable, sizeof(DIRENT2) * superBlock.hashTableSize) != 0)
+        return -3;
+
+    openFiles[handle] = newFile;
+
+    return handle;
 }
 
 

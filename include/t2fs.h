@@ -8,7 +8,6 @@
 #define WORKING_PART 0 // Partição utilizada pelo FS
 #define FILE_NAME_MAX_LENGTH 31+1
 #define MAX_NUMBER_FILES 64
-#define DIR_HASHTABLE_SIZE 8
 
 #define FAT_FREE_CHAR 0xFFFFFFFF
 #define FAT_LAST_BLOCK_CHAR 0xDDDDDDDD
@@ -28,6 +27,23 @@ typedef unsigned int DWORD;
 #define MAX_FILE_NAME_SIZE 31
 
 #pragma pack(push, 1)
+
+// Open Files
+typedef struct {
+	int pointer;
+	int firstBlock;
+	int block;
+} OFILE;
+
+OFILE openFiles[20];
+
+// Open Directories
+typedef struct {
+	int readCount;
+	int block;
+} ODIR;
+
+ODIR openDirs[20];
 
 // Partition Table Entry
 typedef struct {
@@ -57,6 +73,9 @@ typedef struct {
 	WORD	dataBlocksAreaStart; // Início da área de blocos de dados
 	WORD 	dataBlocksAreaSize;
 	WORD 	numberOfDataBlocks;
+	WORD	hashTableSize;
+	BYTE	cwdHandle;
+	char 	*cwdPath;
 } SUPERBLOCK;
 
 SUPERBLOCK superBlock;

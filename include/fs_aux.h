@@ -15,7 +15,7 @@ int diskInit();
 DWORD getPartitionSize();
 
 // Cria o superbloco na partição
-int createSuperblock(int sectorsPerBlock);
+int createSuperblock(int sectorsPerBlock); 
 
 // Carrega os dados do superbloco
 int initFS();
@@ -47,14 +47,22 @@ DIRENT2 readDirEnt(WORD addr);
 // Salva uma entrada de diretório no disco e retorna o endereço
 WORD writeDirEnt(DIRENT2 *ent);
 
-// Escreve no disco um bloco de dados
+// Escreve em um bloco de dados do disco
 int writeData(WORD block, void *data, int size);
 
+// Lê de um bloco de dados do disco
 void* readData(WORD block, int size);
 
 // Cria o diretorio raiz no primeiro bloco de dados [BLOCO 0]
 int createRootDir();
 
+// Quebra uma pathstring em uma sequencia de caminhos relativos
+char** decodePath(char* path);
 
+FILE2 getFreeFileHandle();
+
+char* getCWD();
+
+FILE2 createFile(char *name);
 
 #endif

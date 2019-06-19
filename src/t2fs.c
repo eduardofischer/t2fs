@@ -9,7 +9,7 @@
 Função:	Informa a identificação dos desenvolvedores do T2FS.
 -----------------------------------------------------------------------------*/
 int identify2 (char *name, int size) {
-	strncpy (name, "Eduardo Spitzer Fischer - 00290399 | Maria Flavia Borrajo Tondo - 00278892 | Rodrigo Paranhos Bastos - 00261162\0", size);
+	strncpy (name, "Eduardo Spitzer Fischer    | 00290399\nMaria Flavia Borrajo Tondo | 00278892\nRodrigo Paranhos Bastos    | 00261162\0", size);
 	return 0;
 }
 
@@ -52,7 +52,7 @@ FILE2 create2 (char *filename) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return createFile(filename);
 }
 
 /*-----------------------------------------------------------------------------
@@ -144,7 +144,10 @@ int mkdir2 (char *pathname) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	
+
+
+	return 0;
 }
 
 /*-----------------------------------------------------------------------------
@@ -177,7 +180,9 @@ int getcwd2 (char *pathname, int size) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	strcpy(pathname, getCWD());
+
+	return 0;
 }
 
 /*-----------------------------------------------------------------------------

@@ -6,8 +6,8 @@
 
 unsigned int hash(const char *str, int tablesize);
 
-DIRENT2* findHashEntry(DIRENT2 *table[], const char *key);
+DIRENT2* findHashEntry(DIRENT2 *table, const char *key);
 
-int insertHashEntry(DIRENT2 *table[], DIRENT2 *file);
+int insertHashEntry(DIRENT2 *table, DIRENT2 *file);
 
 #endif

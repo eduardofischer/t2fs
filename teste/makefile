@@ -2,7 +2,7 @@ CC=gcc
 LIB_DIR=../lib
 SRC_DIR=../src
 
-all: readMBR formatPart testFAT testDirEnt
+all: readMBR formatPart testFAT testDirEnt testAux
 
 readMBR: readMBR.c $(LIB_DIR)/libt2fs.a
 	$(CC) readMBR.c -o readMBR -L$(LIB_DIR) -lt2fs -Wall
@@ -16,7 +16,10 @@ testFAT: testFAT.c $(LIB_DIR)/libt2fs.a
 testDirEnt: testDirEnt.c $(LIB_DIR)/libt2fs.a
 	$(CC) testDirEnt.c -o testDirEnt -L$(LIB_DIR) -lt2fs -Wall
 
+testAux: testAux.c $(LIB_DIR)/libt2fs.a
+	$(CC) testAux.c -o testAux -L$(LIB_DIR) -lt2fs -Wall
+
 clean:
-	rm -rf readMBR formatPart testFAT testDirEnt
+	rm -rf readMBR formatPart testFAT testDirEnt testAux
 
 
