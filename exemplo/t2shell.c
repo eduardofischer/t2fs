@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "t2fs.h"
+#include "../include/t2fs.h"
 
 
 void cmdMan(void);
@@ -200,7 +200,7 @@ void tst_list_dir(char *src) {
 	
 	printf ("Teste do opendir(), readdir() e closedir()\n");
 	
-    // Abre o diretório pedido
+    // Abre o diretï¿½rio pedido
     d = opendir2(src);
     if (d<0) {
         printf ("Erro: Opendir %s (handle=%d)\n", src, d);
@@ -468,29 +468,29 @@ void teste(int tstNumber) {
 			
 		case 6:
 			tst_create("y.txt");
-			tst_list_dir(".");		// Verificação
+			tst_list_dir(".");		// Verificaï¿½ï¿½o
 			break;
 		case 7:
 			tst_write("y.txt", "[abcdefghijklmnopqrst]"); 
-			tst_read("y.txt");		// Verificação
+			tst_read("y.txt");		// Verificaï¿½ï¿½o
 			break;
 		case 8:
 			tst_truncate("y.txt", 11);
-			tst_read("y.txt");		// Verificação
+			tst_read("y.txt");		// Verificaï¿½ï¿½o
 			break;
 		case 9:
 			tst_delete("y.txt");
-			tst_list_dir(".");		// Verificação
+			tst_list_dir(".");		// Verificaï¿½ï¿½o
 			break;
 			
 		case 10:
 			tst_create_dir("ndir");
-			tst_list_dir(".");		// Verificação
+			tst_list_dir(".");		// Verificaï¿½ï¿½o
 			tst_list_dir("ndir");
 			break;
 		case 11:
 			tst_delete_dir("ndir");
-			tst_list_dir(".");		// Verificação
+			tst_list_dir(".");		// Verificaï¿½ï¿½o
 			break;
 			
 		case 12:
@@ -525,7 +525,7 @@ int main()
         printf ("T2FS> ");
         gets(cmd);
         if( (token = strtok(cmd," \t")) != NULL ) {
-			// Verifica se é comando de teste
+			// Verifica se ï¿½ comando de teste
 			n = atoi(token);
 			if (n) {
 				teste(n);
@@ -551,7 +551,7 @@ int main()
 }
 
 /**
-Encerra a operação do teste
+Encerra a operaï¿½ï¿½o do teste
 */
 void cmdExit(void) {
     printf ("bye, bye!\n");
@@ -586,7 +586,7 @@ void cmdMan(void) {
 
 
 /**
-Chama a função que formata o disco
+Chama a funï¿½ï¿½o que formata o disco
 */
 void cmdFormat(void) {
 	int sectors_per_block;
@@ -611,7 +611,7 @@ void cmdFormat(void) {
 
 	
 /**
-Chama da função identify2 da biblioteca e coloca o string de retorno na tela
+Chama da funï¿½ï¿½o identify2 da biblioteca e coloca o string de retorno na tela
 */
 void cmdWho(void) {
     char name[256];
@@ -625,7 +625,7 @@ void cmdWho(void) {
 
 /**
 Copia arquivo dentro do T2FS
-Os parametros são:
+Os parametros sï¿½o:
     primeiro parametro => arquivo origem
     segundo parametro  => arquivo destino
 */
@@ -644,7 +644,7 @@ void cmdCp(void) {
         printf ("Open source file error: %d\n", hSrc);
         return;
     }
-    // Cria o arquivo de destino, que será resetado se existir
+    // Cria o arquivo de destino, que serï¿½ resetado se existir
     FILE2 hDst = create2 (dst);
     if (hDst<0) {
         close2(hSrc);
@@ -665,15 +665,15 @@ void cmdCp(void) {
 
 /**
 Copia arquivo de um sistema de arquivos para o outro
-Os parametros são:
-    primeiro parametro => direção da copia
+Os parametros sï¿½o:
+    primeiro parametro => direï¿½ï¿½o da copia
         -t copiar para o T2FS
         -f copiar para o FS do host
     segundo parametro => arquivo origem
     terceiro parametro  => arquivo destino
 */
 void cmdFscp(void) {
-    // Pega a direção e os nomes dos arquivos origem e destion
+    // Pega a direï¿½ï¿½o e os nomes dos arquivos origem e destion
     char *direcao = strtok(NULL, " \t");
     char *src = strtok(NULL," \t");
     char *dst = strtok(NULL," \t");
@@ -681,7 +681,7 @@ void cmdFscp(void) {
         printf ("Missing parameter\n");
         return;
     }
-    // Valida direção
+    // Valida direï¿½ï¿½o
     if (strncmp(direcao, "-t", 2)==0) {
         // src == host
         // dst == T2FS
@@ -692,7 +692,7 @@ void cmdFscp(void) {
             printf ("Open source file error\n");
             return;
         }
-        // Cria o arquivo de destino, que será resetado se existir
+        // Cria o arquivo de destino, que serï¿½ resetado se existir
         FILE2 hDst = create2 (dst);
         if (hDst<0) {
             fclose(hSrc);
@@ -718,7 +718,7 @@ void cmdFscp(void) {
             printf ("Open source file error: %d\n", hSrc);
             return;
         }
-        // Cria o arquivo de destino, que será resetado se existir
+        // Cria o arquivo de destino, que serï¿½ resetado se existir
         FILE *hDst = fopen(dst, "w+");
         if (hDst==NULL) {
             printf ("Open destination file error\n");
@@ -743,7 +743,7 @@ void cmdFscp(void) {
 
 /**
 Cria o arquivo informado no parametro
-Retorna eventual sinalização de erro
+Retorna eventual sinalizaï¿½ï¿½o de erro
 Retorna o HANDLE do arquivo criado
 */
 void cmdCreate(void) {
@@ -766,7 +766,7 @@ void cmdCreate(void) {
 
 /**
 Apaga o arquivo informado no parametro
-Retorna eventual sinalização de erro
+Retorna eventual sinalizaï¿½ï¿½o de erro
 */
 void cmdDelete(void) {
 
@@ -787,7 +787,7 @@ void cmdDelete(void) {
 
 /**
 Abre o arquivo informado no parametro [0]
-Retorna sinalização de erro
+Retorna sinalizaï¿½ï¿½o de erro
 Retorna HANDLE do arquivo retornado
 */
 void cmdOpen(void) {
@@ -809,9 +809,9 @@ void cmdOpen(void) {
 }
 
 /**
-Fecha o arquivo cujo handle é o parametro
-Retorna sinalização de erro
-Retorna mensagem de operação completada
+Fecha o arquivo cujo handle ï¿½ o parametro
+Retorna sinalizaï¿½ï¿½o de erro
+Retorna mensagem de operaï¿½ï¿½o completada
 */
 void cmdClose(void) {
     FILE2 handle;
@@ -1006,7 +1006,7 @@ void cmdLs(void) {
         return;
     }
 
-    // Abre o diretório pedido
+    // Abre o diretï¿½rio pedido
     DIR2 d;
     d = opendir2(token);
     if (d<0) {
@@ -1027,7 +1027,7 @@ void cmdLs(void) {
 
 
 /**
-Chama a função truncate2() da biblioteca e coloca o string de retorno na tela
+Chama a funï¿½ï¿½o truncate2() da biblioteca e coloca o string de retorno na tela
 */
 void cmdTrunc(void) {
     FILE2 handle;
