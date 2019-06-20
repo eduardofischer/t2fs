@@ -74,7 +74,7 @@ FILE2 open2 (char *filename) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return openFile(filename);
 }
 
 /*-----------------------------------------------------------------------------
@@ -85,7 +85,7 @@ int close2 (FILE2 handle) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return closeFile(handle);
 }
 
 /*-----------------------------------------------------------------------------
@@ -97,7 +97,7 @@ int read2 (FILE2 handle, char *buffer, int size) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return readFile(handle, buffer, size);
 }
 
 /*-----------------------------------------------------------------------------
@@ -109,7 +109,7 @@ int write2 (FILE2 handle, char *buffer, int size) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return writeToFile(handle, buffer, size);
 }
 
 /*-----------------------------------------------------------------------------
@@ -122,7 +122,7 @@ int truncate2 (FILE2 handle) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return truncateFile(handle);
 }
 
 /*-----------------------------------------------------------------------------
@@ -133,7 +133,7 @@ int seek2 (FILE2 handle, DWORD offset) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return seek(handle, offset);
 }
 
 /*-----------------------------------------------------------------------------

@@ -9,6 +9,7 @@ int hasInit;
 #define WORKING_PART 0 // Partição utilizada pelo FS
 #define FILE_NAME_MAX_LENGTH 31+1
 #define MAX_NUMBER_FILES 64
+#define MAX_NUMBER_OPEN_FILES 20
 
 #define FAT_FREE_CHAR 0xFFFFFFFF
 #define FAT_LAST_BLOCK_CHAR 0xDDDDDDDD
@@ -20,12 +21,14 @@ int hasInit;
 
 // Open Files
 typedef struct {
+	char name[FILE_NAME_MAX_LENGTH+1];
 	int pointer;
 	int firstBlock;
-	int block;
+	int size;
+	WORD dirBlock;
 } OFILE;
 
-OFILE openFiles[20];
+OFILE openFiles[MAX_NUMBER_OPEN_FILES];
 
 // Open Directories
 typedef struct {
@@ -149,5 +152,17 @@ int changeDirectory(char *pathname);
 char *toAbsolutePath(char *path);
 
 int removeDirectory(char *pathname);
+
+FILE2 openFile(char *pathname);
+
+int writeToFile(FILE2 handle, char *buffer, int size);
+
+int readFile(FILE2 handle, char *buffer, int size);
+
+int seek(FILE2 handle, DWORD offset);
+
+int truncateFile(FILE2 handle);
+
+int closeFile(FILE2 handle);
 
 #endif

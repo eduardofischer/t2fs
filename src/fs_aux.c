@@ -73,7 +73,8 @@ int initOpenStructs(){
     OFILE invalidFile;
     invalidFile.pointer = INVALID_PTR;
     invalidFile.firstBlock = INVALID_PTR;
-    invalidFile.block = INVALID_PTR;
+    invalidFile.size = INVALID_PTR;
+    invalidFile.dirBlock = INVALID_PTR;
 
     ODIR invalidDir;
     invalidDir.readCount = INVALID_PTR;
@@ -466,9 +467,11 @@ FILE2 createFile(char *name){
     if((strcmp(name, "/") | strcmp(name, ".") | strcmp(name, "..")) == 0)
         return -1;
 
+    strcpy((char*)&(newFile.name), name);
     newFile.pointer = 0;
-    newFile.block = addr;
     newFile.firstBlock = addr;
+    newFile.size = 0;
+    newFile.dirBlock = openDirs[cwdHandle].block;
 
     DIRENTRY *dirEntry = malloc(sizeof(DIRENTRY));
     strcpy((char*)&(dirEntry->name), name);
@@ -601,6 +604,29 @@ int loadDirHandle(DIRENTRY dir){
     return handle;
 }
 
+int loadFileHandle(DIRENTRY file, WORD dirBlock){
+    OFILE newFile;
+    int handle = isFileOpen(file);
+
+    if(handle >= 0)
+        return handle;
+
+    handle = getFreeFileHandle();
+
+    if(handle < 0)
+        return -1;
+
+    strcpy((char*)&(newFile.name), file.name);
+    newFile.pointer = 0;
+    newFile.firstBlock = file.firstBlock;
+    newFile.size = file.fileSize;
+    newFile.dirBlock = dirBlock;
+
+    openFiles[handle] = newFile;
+
+    return handle;
+}
+
 int closeDirectory(DIR2 handle){
     ODIR invalidDir;
     invalidDir.readCount = INVALID_PTR;
@@ -637,8 +663,6 @@ int openPathDirs(){
     // Percorre o path
     for(i=1; i<branchLength; i++){
         dir = findHashEntry(dirTable, branch[i]);
-
-        printf("Open: %s\n", branch[i]);
 
         // Caso o diretório seja inválido
         if(dir == NULL || dir->fileType != DIRECTORY_FT)
@@ -858,6 +882,221 @@ int removeDirectory(char *pathname){
 
     setFAT(dir->firstBlock, FAT_FREE_CHAR);
 
+    return 0;
+}
+
+FILE2 openFile(char *pathname){
+    int branchLength = 0;
+    char **branch = decodePath(pathname, &branchLength);
+    DIRENTRY *dirTable, *dir, *file;
+    DIR2 dirHandle;
+    int i, j=0;
+
+    if(strcmp(branch[0], "/") == 0){
+        dirTable = readData(openDirs[0].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        j++;
+    } else {
+        dirTable = readData(openDirs[superBlock.cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+    }
+    
+    // Navega até o diretório pai
+    for(i=j; i<branchLength-1; i++){
+        if(strcmp(branch[i], ".") != 0){
+            dir = findHashEntry(dirTable, branch[i]);
+            if(dir == NULL || dir->fileType != DIRECTORY_FT)
+                return -1;
+
+            dirHandle = loadDirHandle(*dir);
+            if(dirHandle < 0)
+                return -2;    
+
+            if(openDirs[dirHandle].block == INVALID_PTR)
+                return -3;
+
+            dirTable = (DIRENTRY*)readData(openDirs[dirHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        } else{
+            dirHandle = superBlock.cwdHandle;
+        }
+    }
+
+    closeAllDirectories();
+    openPathDirs();
+
+    file = findHashEntry(dirTable, branch[i]);
+
+    if(file == NULL || file->fileType != REGULAR_FT)
+        return -1;
+
+    return loadFileHandle(*file, openDirs[dirHandle].block);
+}
+
+int updateFileDirEntry(FILE2 handle){
+    OFILE file = openFiles[handle];
+    DIRENTRY *dirTable = readData(file.dirBlock, sizeof(DIRENTRY) * superBlock.hashTableSize);
+    DIRENTRY *fileEntry = findHashEntry(dirTable, file.name);
+
+    fileEntry->fileSize = file.size;
+    fileEntry->firstBlock = file.firstBlock;
+
+    if(updateHashEntry(dirTable, fileEntry) != 0)
+        return -1;
+
+    if(writeData(file.dirBlock, dirTable, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
+        return -2;
+    
+    return 0;
+}
+
+WORD getFileNthBlock(FILE2 handle, int n){
+    DWORD addr;
+    DWORD next;
+
+    if(openFiles[handle].firstBlock == INVALID_PTR){
+        openFiles[handle].firstBlock = getFATFreeAddr();
+        setFAT(openFiles[handle].firstBlock, FAT_LAST_BLOCK_CHAR);
+    }
+
+    addr = openFiles[handle].firstBlock;
+
+    int i;
+    for(i=1; i<n; i++){
+        if(getFAT(addr) == FAT_LAST_BLOCK_CHAR){
+            next = getFATFreeAddr();
+            setFAT(addr, next);
+        }
+        addr = next;
+    }
+    setFAT(addr, FAT_LAST_BLOCK_CHAR);
+        
+    return addr;
+}
+
+int writeToFile(FILE2 handle, char *buffer, int size){
+    OFILE *file = &(openFiles[handle]);
+
+    if(file->pointer == INVALID_PTR)
+        return -1;
+
+    int bytesToWrite = size;
+    int startPointer = file->pointer;
+    int blockSize = superBlock.sectorsPerBlock * SECTOR_SIZE;
+    int nBlocks = 1 + ((file->pointer % blockSize) + size) / blockSize;
+    int fileBlock, diskBlock, offset;
+    
+    BYTE *blockBuffer;
+
+    int i, writeSize;
+    for(i=1; i <= nBlocks; i++){
+        fileBlock = file->pointer / blockSize;
+        offset = file->pointer % blockSize;
+
+        diskBlock = getFileNthBlock(handle, fileBlock + i);
+
+        blockBuffer = readData(diskBlock, blockSize);
+
+        if(bytesToWrite < (blockSize - offset))
+            writeSize = bytesToWrite;
+        else
+            writeSize = blockSize - offset;
+        
+        memcpy(blockBuffer + offset, buffer, writeSize);
+
+        if(writeData(diskBlock, blockBuffer, blockSize) != 0)
+            return -1;
+
+        file->pointer += writeSize;
+        file->size += writeSize;
+        bytesToWrite -= writeSize;
+    }
+
+    return file->pointer - startPointer;
+}
+
+int readFile(FILE2 handle, char *buffer, int size){
+    OFILE *file = &(openFiles[handle]);
+
+    if(file->pointer == INVALID_PTR)
+        return -1;
+
+    if(file->pointer >= file->size)
+        return 0;
+
+    int bytesToRead = size;
+    int startPointer = file->pointer;
+    int blockSize = superBlock.sectorsPerBlock * SECTOR_SIZE;
+    int nBlocks = 1 + ((file->pointer % blockSize) + size) / blockSize;
+    int fileBlock, diskBlock, offset;
+
+    BYTE *blockBuffer;
+
+
+
+    int i, readSize;
+    for(i=1; i <= nBlocks; i++){
+        fileBlock = file->pointer / blockSize;
+        offset = file->pointer % blockSize;
+
+        diskBlock = getFileNthBlock(handle, fileBlock + i);
+
+        blockBuffer = readData(diskBlock, blockSize);
+
+        if(bytesToRead < (blockSize - offset))
+            readSize = bytesToRead;
+        else
+            readSize = blockSize - offset;
+
+        if((file->pointer - startPointer) + readSize > file->size)
+            readSize = file->size - file->pointer;
+        
+        memcpy(buffer, blockBuffer + offset, readSize);
+
+        file->pointer += readSize;
+        bytesToRead -= readSize;
+    }
+
+    return file->pointer - startPointer;
+}
+
+int seek(FILE2 handle, DWORD offset){
+    OFILE *file = &openFiles[handle];
+
+    if(handle < 0 || handle >= MAX_NUMBER_OPEN_FILES)
+        return -1;
+
+    if(offset == (DWORD)INVALID_PTR)
+        file->pointer = file->size;
+    else
+        file->pointer = offset;
+    
+    return 0;
+}
+
+int closeFile(FILE2 handle){
+    if(handle < 0 || handle >= sizeof(openFiles)/sizeof(OFILE))
+        return -1;
+
+    if(updateFileDirEntry(handle) != 0)
+        return -1;
+
+    OFILE invalidFile;
+    invalidFile.dirBlock = INVALID_PTR;
+    invalidFile.firstBlock = INVALID_PTR;
+    invalidFile.pointer = INVALID_PTR;
+    invalidFile.size = INVALID_PTR;
+
+    openFiles[handle] = invalidFile;
+
+    return 0;
+}
+
+int truncateFile(FILE2 handle){
+    OFILE *file = &openFiles[handle];
+
+    if(handle < 0 || handle >= MAX_NUMBER_OPEN_FILES)
+        return -1;
+
+    file->size = file->pointer;
+    
     return 0;
 }
 

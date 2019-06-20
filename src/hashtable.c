@@ -54,6 +54,35 @@ int insertHashEntry(DIRENTRY *table, DIRENTRY *file){
     return 0;
 }
 
+int updateHashEntry(DIRENTRY *table, DIRENTRY *file){
+    int index = hash(file->name, superBlock.hashTableSize);
+    DIRENTRY *it = malloc(sizeof(DIRENTRY));
+    memcpy(it, &(table[index]), sizeof(DIRENTRY));
+
+    if(it->fileType == (BYTE)INVALID_PTR)
+        return -2; 
+
+    // Caso a entrada esteja armazenada na tabela
+    if(strcmp(it->name, file->name) == 0){
+        memcpy(&(table[index]), file, sizeof(DIRENTRY));
+        return 0;
+    }
+
+    WORD saveAddr;
+
+    // Caso esteja armazenada em Linked List
+    while(it->next != (BYTE)INVALID_PTR) {
+        printf("Preso aqui\n");
+        DIRENTRY *next = readDirEnt(it->next);
+        saveAddr = it->next;
+        memcpy(it, next, sizeof(DIRENTRY));
+        if(strcmp(it->name, file->name) == 0)
+            writeDirEntAtAddr(file, saveAddr);         
+    };
+
+    return 0;
+}
+
 int removeHashEntry(DIRENTRY *table, DIRENTRY *file){
     int index = hash(file->name, superBlock.hashTableSize);
     DIRENTRY *it = malloc(sizeof(DIRENTRY));
