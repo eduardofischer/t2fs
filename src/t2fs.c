@@ -155,7 +155,7 @@ int rmdir2 (char *pathname) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return removeDirectory(pathname);
 }
 
 /*-----------------------------------------------------------------------------

@@ -25,7 +25,7 @@ int main(int argc, char const *argv[]){
     free(test);
 
     printf("Reading dirEnt at %x\n", addr);
-    DIRENTRY readDire = readDirEnt(addr);
+    DIRENTRY readDire = *readDirEnt(addr);
 
     printf("Reading dirEnt name: %s\n", readDire.name);
 

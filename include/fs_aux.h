@@ -113,10 +113,12 @@ WORD getDirEntFreeAddr();
 int setDirEntAddr(WORD addr, BYTE value);
 
 // Lê uma entrada de diretório no disco
-DIRENTRY readDirEnt(WORD addr);
+DIRENTRY *readDirEnt(WORD addr);
 
 // Salva uma entrada de diretório no disco e retorna o endereço
 WORD writeDirEnt(DIRENTRY *ent);
+
+WORD writeDirEntAtAddr(DIRENTRY *ent, WORD addr);
 
 // Escreve em um bloco de dados do disco
 int writeData(WORD block, void *data, int size);
@@ -145,5 +147,7 @@ DIR2 openDirectory(char *pathname);
 int changeDirectory(char *pathname);
 
 char *toAbsolutePath(char *path);
+
+int removeDirectory(char *pathname);
 
 #endif
