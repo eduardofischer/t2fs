@@ -12,7 +12,7 @@ int main(int argc, char const *argv[]){
     printf("Disco inicializado com sucesso\n");
 
 
-    DIRENT2 *test = malloc(sizeof(DIRENT2));
+    DIRENTRY *test = malloc(sizeof(DIRENTRY));
     strcpy((char *)&(test->name), "Diretorio 9");
     test->fileType = 0x02;
     test->fileSize = 100;
@@ -25,13 +25,13 @@ int main(int argc, char const *argv[]){
     free(test);
 
     printf("Reading dirEnt at %x\n", addr);
-    DIRENT2 readDire = readDirEnt(addr);
+    DIRENTRY readDire = readDirEnt(addr);
 
     printf("Reading dirEnt name: %s\n", readDire.name);
 
     printf("Teste do Root\n");
 
-    DIRENT2 *root = readData(0, sizeof(DIRENT2));
+    DIRENTRY *root = readData(0, sizeof(DIRENTRY));
     printf("name: %s\n", root->name);
     printf("fileType: %x\n", root->fileType);
     printf("fileSize: %u\n", root->fileSize);

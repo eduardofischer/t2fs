@@ -1120,7 +1120,7 @@ void cmdGetCW(void) {
         return;
     }
 	
-	printf ("cd = %s\n\n", buffer);
+	printf ("%s\n", buffer);
 }
 void cmdChangeCW(void) {
 	int err;

@@ -144,10 +144,7 @@ int mkdir2 (char *pathname) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	
-
-
-	return 0;
+	return createDir(pathname);
 }
 
 /*-----------------------------------------------------------------------------
@@ -169,7 +166,7 @@ int chdir2 (char *pathname) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return changeDirectory(pathname);
 }
 
 /*-----------------------------------------------------------------------------
@@ -193,7 +190,7 @@ DIR2 opendir2 (char *pathname) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return openDirectory(pathname);
 }
 
 /*-----------------------------------------------------------------------------
@@ -204,7 +201,7 @@ int readdir2 (DIR2 handle, DIRENT2 *dentry) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return readDir(handle, dentry);
 }
 
 /*-----------------------------------------------------------------------------

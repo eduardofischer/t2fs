@@ -16,10 +16,10 @@ int hash(const char *str, int tablesize){
     return value % tablesize;
 }
 
-DIRENT2* findHashEntry(DIRENT2 *table, const char *key){
+DIRENTRY* findHashEntry(DIRENTRY *table, const char *key){
     int index = hash(key, superBlock.hashTableSize);
-    DIRENT2 *it = malloc(sizeof(DIRENT2));
-    memcpy(it, &(table[index]), sizeof(DIRENT2));
+    DIRENTRY *it = malloc(sizeof(DIRENTRY));
+    memcpy(it, &(table[index]), sizeof(DIRENTRY));
 
     if(it->fileType == (BYTE)INVALID_PTR)
         return NULL; 
@@ -28,8 +28,8 @@ DIRENT2* findHashEntry(DIRENT2 *table, const char *key){
         return it;
 
     while(it->next != (BYTE)INVALID_PTR) {
-        DIRENT2 next = readDirEnt(it->next);
-        memcpy(it, &next, sizeof(DIRENT2));
+        DIRENTRY next = readDirEnt(it->next);
+        memcpy(it, &next, sizeof(DIRENTRY));
         if(strcmp(it->name, key) == 0)
             return it;    
     };
@@ -37,8 +37,8 @@ DIRENT2* findHashEntry(DIRENT2 *table, const char *key){
     return NULL;
 }
 
-int insertHashEntry(DIRENT2 *table, DIRENT2 *file){
-    DIRENT2 *hashTable = table;
+int insertHashEntry(DIRENTRY *table, DIRENTRY *file){
+    DIRENTRY *hashTable = table;
     if(findHashEntry(hashTable, file->name) == NULL) {
         int index = hash(file->name, superBlock.hashTableSize);
         if(table[index].fileType == (BYTE)INVALID_PTR){
@@ -52,4 +52,31 @@ int insertHashEntry(DIRENT2 *table, DIRENT2 *file){
         return -1; // Entrada já existe na tabela
     }
     return 0;
+}
+
+DIRENTRY *getNthEntry(DIRENTRY *table, int n){
+    int i=0, found=0;
+    DIRENTRY *it = malloc(sizeof(DIRENTRY));
+
+    while(i < superBlock.hashTableSize){
+        memcpy(it, &(table[i]), sizeof(DIRENTRY));
+        if(it->fileType == (BYTE)INVALID_PTR){
+            i++;
+        }else{
+            found++;
+            if(found == n+1)
+                return it;
+
+            while(it->next != (BYTE)INVALID_PTR) {
+                DIRENTRY next = readDirEnt(it->next);
+                memcpy(it, &next, sizeof(DIRENTRY));
+                found++;
+                if(found == n+1)
+                    return it;  
+            };
+            i++;
+        }
+    }
+
+    return NULL;
 }

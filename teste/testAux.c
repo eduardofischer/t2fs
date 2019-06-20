@@ -11,15 +11,15 @@ int main(int argc, char const *argv[]){
 
     printf("Disco inicializado com sucesso\n");
 
-    char str[] = "../teste/eduardo/file.txt";
+    int count;
+    char str[] = "teste/eduardo/file.txt";
 
-    char **pathArray = decodePath(str);
-    int arraySize = sizeof(pathArray)/sizeof(char);
+    char **pathArray = decodePath(str, &count);
 
-    printf("Array size %d\n", arraySize);
+    printf("Array size %d\n", count);
 
     int i;
-    for(i=0; i<arraySize; i++){
+    for(i=0; i<count; i++){
         printf("Item %d: %s\n", i, pathArray[i]);
     }
 

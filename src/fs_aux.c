@@ -44,20 +44,19 @@ int createSuperblock(int sectorsPerBlock){
     // Logo após a FAT, se inicia uma área reservada ao armazenamento de entradas de diretório
     // O primeiro setor dessa área é utilizado como bitmap (bytemap nesse caso)
     newSB.entDirAreaStart = newSB.fatStart + newSB.fatSize;
-    newSB.entDirAreaSize = (MAX_NUMBER_FILES * sizeof(DIRENT2))/SECTOR_SIZE;
+    newSB.entDirAreaSize = (MAX_NUMBER_FILES * sizeof(DIRENTRY))/SECTOR_SIZE;
 
     // O espaço restante é então ocupado por blocos de dados
     newSB.dataBlocksAreaStart = newSB.entDirAreaStart + newSB.entDirAreaSize;
     newSB.dataBlocksAreaSize = getPartitionSize(WORKING_PART) - 1 - newSB.fatSize - newSB.entDirAreaSize;
     newSB.numberOfDataBlocks = newSB.dataBlocksAreaSize / newSB.sectorsPerBlock;
 
-    newSB.hashTableSize = sectorsPerBlock * SECTOR_SIZE / sizeof(DIRENT2);
+    newSB.hashTableSize = sectorsPerBlock * SECTOR_SIZE / sizeof(DIRENTRY);
 
-    printf("Hash Table Size: %d", newSB.hashTableSize);
+    printf("Hash Table Size: %d\n", newSB.hashTableSize);
 
     // Diretório corrente padrão
     newSB.cwdHandle = 0;
-    newSB.cwdPath = malloc(2);
     strcpy(newSB.cwdPath, "/");
 
     BYTE buffer[SECTOR_SIZE] = {0};
@@ -205,7 +204,7 @@ WORD getDirEntFreeAddr(){
     BYTE *buffer = malloc(SECTOR_SIZE);
     int j=0;
     int sector = superBlock.entDirAreaStart; 
-    int entriesPerSector = SECTOR_SIZE/sizeof(DIRENT2);
+    int entriesPerSector = SECTOR_SIZE/sizeof(DIRENTRY);
 
     BYTE dirEntSector;
     BYTE dirEntOffset;
@@ -229,7 +228,7 @@ WORD getDirEntFreeAddr(){
 int setDirEntAddr(WORD addr, BYTE value){
     BYTE *buffer = malloc(SECTOR_SIZE);
     int sector = superBlock.entDirAreaStart; 
-    int entriesPerSector = SECTOR_SIZE/sizeof(DIRENT2);
+    int entriesPerSector = SECTOR_SIZE/sizeof(DIRENTRY);
     int offset = (BYTE)(addr) * entriesPerSector + (BYTE)(addr >> 8);
 
     if(read_sector(sector, buffer) != 0)
@@ -245,21 +244,21 @@ int setDirEntAddr(WORD addr, BYTE value){
     return 0;
 }
 
-DIRENT2 readDirEnt(WORD addr){
+DIRENTRY readDirEnt(WORD addr){
     WORD sector = superBlock.entDirAreaStart + 1 + (BYTE)(addr);
-    WORD offset = (BYTE)(addr >> 8)*sizeof(DIRENT2);
+    WORD offset = (BYTE)(addr >> 8)*sizeof(DIRENTRY);
     BYTE *buffer = malloc(SECTOR_SIZE);
-    DIRENT2 ent;
+    DIRENTRY ent;
 
     read_sector((unsigned int)sector, buffer);
-    memcpy(&ent, buffer + offset, sizeof(DIRENT2));
+    memcpy(&ent, buffer + offset, sizeof(DIRENTRY));
 
     free(buffer);
 
     return ent;
 }
 
-WORD writeDirEnt(DIRENT2 *ent){
+WORD writeDirEnt(DIRENTRY *ent){
     WORD freeAddr = getDirEntFreeAddr();
     BYTE *buffer = malloc(SECTOR_SIZE);
 
@@ -269,12 +268,12 @@ WORD writeDirEnt(DIRENT2 *ent){
     }
 
     int sector = superBlock.entDirAreaStart + 1 + (BYTE)(freeAddr);
-    int offset = (BYTE)(freeAddr >> 8)*sizeof(DIRENT2);
+    int offset = (BYTE)(freeAddr >> 8)*sizeof(DIRENTRY);
 
     if(read_sector(sector, buffer) != 0)
         return -2;
 
-    memcpy(buffer + offset, ent, sizeof(DIRENT2));
+    memcpy(buffer + offset, ent, sizeof(DIRENTRY));
 
     if(write_sector(sector, buffer) != 0)
         return -2;
@@ -288,7 +287,7 @@ WORD writeDirEnt(DIRENT2 *ent){
 }
 
 int writeData(WORD block, void *data, int size){
-    int firstSector = superBlock.dataBlocksAreaStart + block / superBlock.sectorsPerBlock;
+    int firstSector = superBlock.dataBlocksAreaStart + block * superBlock.sectorsPerBlock;
     BYTE *buffer = malloc(SECTOR_SIZE * superBlock.sectorsPerBlock);
     memset(buffer, -1, SECTOR_SIZE * superBlock.sectorsPerBlock);
 
@@ -308,7 +307,7 @@ int writeData(WORD block, void *data, int size){
 }
 
 void* readData(WORD block, int size){
-    int firstSector = superBlock.dataBlocksAreaStart + block / superBlock.sectorsPerBlock;
+    int firstSector = superBlock.dataBlocksAreaStart + block * superBlock.sectorsPerBlock;
     BYTE *buffer = malloc(SECTOR_SIZE * superBlock.sectorsPerBlock);
     BYTE *data = malloc(size);
 
@@ -324,11 +323,11 @@ void* readData(WORD block, int size){
     return (void*)data;
 }
 
-DIRENT2* createDirTable(){
-    DIRENT2 *table = malloc(superBlock.hashTableSize*sizeof(DIRENT2));
+DIRENTRY* createDirTable(){
+    DIRENTRY *table = malloc(superBlock.hashTableSize*sizeof(DIRENTRY));
     int i;
-    DIRENT2 empty;
-    memset(empty.name, ' ', MAX_FILE_NAME_SIZE+1);
+    DIRENTRY empty;
+    memset(empty.name, 0, MAX_FILE_NAME_SIZE+1);
     empty.fileType = INVALID_PTR;
     empty.fileSize = INVALID_PTR;
     empty.firstBlock = INVALID_PTR;
@@ -341,48 +340,54 @@ DIRENT2* createDirTable(){
 }
 
 int createRootDir(){
-    DIRENT2 *table = createDirTable();
-    DIRENT2 *this = malloc(sizeof(DIRENT2));
+    DIRENTRY *table = createDirTable();
+    DIRENTRY *this = malloc(sizeof(DIRENTRY));
     
     // Entrada .
     strcpy((char *)this, ".");
     this->fileType = DIRECTORY_FT;
-    this->fileSize = sizeof(DIRENT2) * superBlock.hashTableSize;
+    this->fileSize = sizeof(DIRENTRY) * superBlock.hashTableSize;
     this->firstBlock = 0;
     this->next = INVALID_PTR;
 
     insertHashEntry(table, this);
 
-    if(writeData(0, table, sizeof(DIRENT2) * superBlock.hashTableSize) != 0)
+    if(writeData(0, table, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
         return -1;
 
     return 0;
 }
 
-char** decodePath(char* path){
+char** decodePath(char* path, int *count){
+    (*count) = 0;
     char** pathArray = malloc(2*sizeof(char*));
     char *token;
     const char s[2] = "/";
-    int i=1;
+    int i=1, j=1;
 
     pathArray[0] = malloc(2*sizeof(char*));
-    if(path[0] == '/')
+    if(path[0] == '/'){
         strcpy(pathArray[0], "/");
-    else if(path[0] == '.' && path[1] == '.' && path[2] == '/')
+        (*count)++;
+    }else if(path[0] == '.' && path[1] == '.' && path[2] == '/'){
         i=0;
-    else if(path[0] == '.' && path[1] == '/')
+    }else if(path[0] == '.' && path[1] == '/'){
         i=0;
-    else
+    }else{ 
         strcpy(pathArray[0], ".");
+        (*count)++;
+    }
 
     token = strtok(path, s);
 
     while(token != NULL){
-        pathArray = realloc(pathArray, (i+1)*sizeof(char*));
-        pathArray[i] = malloc(sizeof(token));
+        pathArray = realloc(pathArray, (j+1)*sizeof(char*));
+        pathArray[i] = malloc(strlen(token)+1);
         strcpy(pathArray[i], token);
         token = strtok(NULL, (char *)"/");
+        (*count)++;
         i++;
+        j++;
     }
     
     return pathArray;
@@ -399,9 +404,20 @@ FILE2 getFreeFileHandle(){
     return -1;
 }
 
-DIRENT2 getCWDDirEnt(){
+FILE2 getFreeDirHandle(){
+    int i;
+    int nHandles = sizeof(openDirs) / sizeof(ODIR);
+
+    for(i=0; i<nHandles; i++)
+        if(openDirs[i].readCount == INVALID_PTR)
+            return i;
+
+    return -1;
+}
+
+DIRENTRY getCWDDirEnt(){
     BYTE cwdHandle = superBlock.cwdHandle;
-    DIRENT2 *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENT2) * superBlock.hashTableSize);
+    DIRENTRY *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
 
     return *dirTable;
 }
@@ -415,7 +431,7 @@ FILE2 createFile(char *name){
     WORD addr = getFATFreeAddr();
     FILE2 handle = getFreeFileHandle();
     BYTE cwdHandle = superBlock.cwdHandle;
-    DIRENT2 *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENT2) * superBlock.hashTableSize);
+    DIRENTRY *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
 
     if((strcmp(name, "/") | strcmp(name, ".") | strcmp(name, "..")) == 0)
         return -1;
@@ -424,7 +440,7 @@ FILE2 createFile(char *name){
     newFile.block = addr;
     newFile.firstBlock = addr;
 
-    DIRENT2 *dirEntry = malloc(sizeof(DIRENT2));
+    DIRENTRY *dirEntry = malloc(sizeof(DIRENTRY));
     strcpy((char*)&(dirEntry->name), name);
     dirEntry->fileType = REGULAR_FT;
     dirEntry->fileSize = 0;
@@ -434,12 +450,228 @@ FILE2 createFile(char *name){
     if(insertHashEntry(dirTable, dirEntry) != 0)
         return -2; // Caso o arquivo já exista [FALTA IMPLEMENTAR]
 
-    if(writeData(openDirs[cwdHandle].block, dirTable, sizeof(DIRENT2) * superBlock.hashTableSize) != 0)
+    if(writeData(openDirs[cwdHandle].block, dirTable, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
         return -3;
 
     openFiles[handle] = newFile;
 
     return handle;
+}
+
+DIR2 createDir(char *pathname){
+    ODIR newDir;
+    WORD addr = getFATFreeAddr();
+    FILE2 handle = getFreeDirHandle();
+    BYTE cwdHandle = superBlock.cwdHandle;
+    DIRENTRY *dirTable = readData(openDirs[cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+    DIRENTRY *newDirTable = createDirTable();
+
+    if((strcmp(pathname, "/") | strcmp(pathname, ".") | strcmp(pathname, "..")) == 0)
+        return -1;
+
+    newDir.readCount = 0;
+    newDir.block = addr;
+
+    DIRENTRY *dirEntry = malloc(sizeof(DIRENTRY));
+    strcpy((char*)&(dirEntry->name), pathname);
+    dirEntry->fileType = DIRECTORY_FT;
+    dirEntry->fileSize = superBlock.sectorsPerBlock * SECTOR_SIZE;
+    dirEntry->firstBlock = addr;
+    dirEntry->next = INVALID_PTR;
+
+    if(insertHashEntry(dirTable, dirEntry) != 0)
+        return -2; // Diretório já existe
+
+    DIRENTRY this, parent;
+    // .
+    strcpy((char *)&(this.name), ".");
+    this.fileType = DIRECTORY_FT;
+    this.fileSize = superBlock.sectorsPerBlock * SECTOR_SIZE;
+    this.firstBlock = addr;
+    this.next = INVALID_PTR;
+    if(insertHashEntry(newDirTable, &this) != 0)
+        return -2;
+    // ..
+    strcpy((char *)&(parent.name), "..");
+    parent.fileType = DIRECTORY_FT;
+    parent.fileSize = superBlock.sectorsPerBlock * SECTOR_SIZE;
+    parent.firstBlock = openDirs[cwdHandle].block;
+    parent.next = INVALID_PTR;
+    if(insertHashEntry(newDirTable, &parent) != 0)
+        return -2;
+
+    if(writeData(addr, newDirTable, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
+        return -3;
+    
+    setFAT(addr, FAT_LAST_BLOCK_CHAR);
+
+    if(writeData(openDirs[cwdHandle].block, dirTable, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
+        return -3;
+
+    openDirs[handle] = newDir;
+
+    return handle;
+}
+
+int readDir(DIR2 handle, DIRENT2 *dentry){
+    DIRENTRY *dirTable = readData(openDirs[handle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+    DIRENTRY *found = getNthEntry(dirTable, openDirs[handle].readCount);
+
+    if(found == NULL){
+        openDirs[handle].readCount = 0;
+        return -1;
+    }
+        
+    openDirs[handle].readCount++;
+    
+    dentry->fileType = found->fileType;
+    dentry->fileSize = found->fileSize;
+    strcpy((char *)&(dentry->name), (char *)&(found->name));
+
+    return 0;
+}
+
+int loadDirHandle(DIRENTRY dir){
+    ODIR newDir;
+    int handle = getFreeDirHandle();
+
+    if(handle < 0)
+        return -1;
+
+    newDir.readCount = 0;
+    newDir.block = dir.firstBlock;
+
+    openDirs[handle] = newDir;
+
+    return handle;
+}
+
+char *toAbsolutePath(char *path){
+    int countCwd = 0, countPath = 0;
+    char **tokensCwd = decodePath(superBlock.cwdPath, &countCwd);
+    char **tokensPath = decodePath(path, &countPath);
+    char *absolute = malloc(128);
+    strcpy(absolute, "/");
+
+    int i;
+    int j=0;
+    int ptr = 0;
+
+    // Corrige os deslocamentos .. e .
+    for(i=0; i<countPath; i++){
+        if(strcmp(tokensPath[i], "..") == 0){
+            countCwd--;
+            j++;
+        }
+        if(strcmp(tokensPath[i], ".") == 0){
+            j++;
+        }
+        
+    }
+
+    // Monta a string final
+    for(i=1; i<countCwd; i++){
+        strcpy(absolute + ptr, "/");
+        ptr++;
+        strcpy(absolute + ptr, tokensCwd[i]);
+        ptr += strlen(tokensCwd[i]);
+    }
+
+    
+
+    for(i=j; i<countPath; i++){
+        strcpy(absolute + ptr, "/");
+        ptr++;
+        strcpy(absolute + ptr, tokensPath[i]);
+        ptr += strlen(tokensPath[i]);
+    }
+    
+    return absolute;
+}
+
+DIR2 openDirectory(char *pathname){
+    int branchLength = 0;
+    char *pathcpy = malloc(strlen(pathname));
+    strcpy(pathcpy, pathname);
+    char **branch = decodePath(pathname, &branchLength);
+    DIRENTRY *dirTable, *dir;
+    DIR2 dirHandle;
+    char *newPath = malloc(128);
+    int i, j=0;
+
+    if(strcmp(branch[0], "/") == 0){
+        dirTable = readData(openDirs[0].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        strcpy(newPath, pathname);
+        j++;
+    } else {
+        dirTable = readData(openDirs[superBlock.cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        strcpy(newPath, toAbsolutePath(pathcpy));
+    }
+    
+    for(i=j; i<branchLength; i++){
+        if(strcmp(branch[i], ".") != 0){
+            dir = findHashEntry(dirTable, branch[i]);
+            if(dir == NULL)
+                return -1;
+
+            dirHandle = loadDirHandle(*dir);
+            if(dirHandle < 0)
+                return -2;    
+
+            if(openDirs[dirHandle].block == INVALID_PTR)
+                return -3;
+
+            dirTable = (DIRENTRY*)readData(openDirs[dirHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        } else{
+            dirHandle = superBlock.cwdHandle;
+        }
+    }
+
+    return dirHandle;
+}
+
+int changeDirectory(char *pathname){
+    int branchLength = 0;
+    char *pathcpy = malloc(strlen(pathname));
+    strcpy(pathcpy, pathname);
+    char **branch = decodePath(pathname, &branchLength);
+    DIRENTRY *dirTable, *dir;
+    DIR2 dirHandle;
+    char *newPath = malloc(128);
+    int i, j=0;
+
+    if(strcmp(branch[0], "/") == 0){
+        dirTable = readData(openDirs[0].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        strcpy(newPath, pathcpy);
+        strcpy(superBlock.cwdPath, newPath);
+        superBlock.cwdHandle = 0;
+        j++;
+    } else {
+        dirTable = readData(openDirs[superBlock.cwdHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+        strcpy(newPath, toAbsolutePath(pathcpy));
+    }
+    
+    for(i=j; i<branchLength; i++){
+        if(strcmp(branch[i], ".") != 0){
+            dir = findHashEntry(dirTable, branch[i]);
+            if(dir == NULL)
+                return -1;
+
+            dirHandle = loadDirHandle(*dir);
+            if(dirHandle < 0)
+                return -2;    
+
+            if(openDirs[dirHandle].block == INVALID_PTR)
+                return -3;
+
+            dirTable = (DIRENTRY*)readData(openDirs[dirHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
+
+            strcpy(superBlock.cwdPath, newPath);
+            superBlock.cwdHandle = dirHandle;
+        }  
+    }
+
+    return 0;
 }
 
 

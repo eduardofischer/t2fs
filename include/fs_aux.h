@@ -6,7 +6,78 @@
 
 int hasInit;
 
-// 31 7E -> 7E 31
+#define WORKING_PART 0 // Partição utilizada pelo FS
+#define FILE_NAME_MAX_LENGTH 31+1
+#define MAX_NUMBER_FILES 64
+
+#define FAT_FREE_CHAR 0xFFFFFFFF
+#define FAT_LAST_BLOCK_CHAR 0xDDDDDDDD
+#define BITMAP_FREE_CHAR 0xEE
+#define BITMAP_TAKEN_CHAR 0xAA
+
+#define REGULAR_FT 0x01
+#define DIRECTORY_FT 0x02
+
+// Open Files
+typedef struct {
+	int pointer;
+	int firstBlock;
+	int block;
+} OFILE;
+
+OFILE openFiles[20];
+
+// Open Directories
+typedef struct {
+	int readCount;
+	int block;
+} ODIR;
+
+ODIR openDirs[20];
+
+// Partition Table Entry
+typedef struct {
+	DWORD	startAddress;
+	DWORD	endAddress;
+	BYTE 	name[24];
+} PARTTE;
+
+// Master Boot Record data
+typedef struct {
+    WORD	diskVersion;
+    WORD	sectorSize;
+    WORD	partitionTableStart;
+    WORD	numberPartitions;
+	PARTTE	partition[4];
+} MBR;
+
+MBR diskMBR;
+
+// Superblock
+typedef struct {
+    WORD	sectorsPerBlock;
+    WORD	fatStart;
+    WORD	fatSize;
+    WORD    entDirAreaStart;
+    WORD    entDirAreaSize; // Número de setores reservados para armazenamento de ENTDIR2 (Entradas de diretório)
+	WORD	dataBlocksAreaStart; // Início da área de blocos de dados
+	WORD 	dataBlocksAreaSize;
+	WORD 	numberOfDataBlocks;
+	WORD	hashTableSize;
+	BYTE	cwdHandle;
+	char 	cwdPath[128];
+} SUPERBLOCK;
+
+SUPERBLOCK superBlock;
+
+typedef struct {
+    char    name[MAX_FILE_NAME_SIZE+1]; /* Nome do arquivo cuja entrada foi lida do disco      */
+    BYTE    fileType;                   /* Tipo do arquivo: regular (0x01) ou diret�rio (0x02) */
+    DWORD   fileSize;                   /* Numero de bytes do arquivo                      */
+
+	WORD	firstBlock; // Primeiro bloco de dados do arquivo [regular] ou bloco do diretório
+	WORD   	next;		// Ponteiro para a próxima entrada (Linked List) ENDEREÇO NO DISCO
+} DIRENTRY;
 
 // Carrega os dados do MBR
 int diskInit();
@@ -32,7 +103,7 @@ DWORD getFAT(int block);
 // Retorna um bloco livre
 WORD getFATFreeAddr();
 
-// Cria o bitmap das entradas livres no espaço reservado aos DIRENT2
+// Cria o bitmap das entradas livres no espaço reservado aos DIRENTRY
 int createDirEntBitMap();
 
 // Retorna um endereço livre no bitmap
@@ -42,10 +113,10 @@ WORD getDirEntFreeAddr();
 int setDirEntAddr(WORD addr, BYTE value);
 
 // Lê uma entrada de diretório no disco
-DIRENT2 readDirEnt(WORD addr);
+DIRENTRY readDirEnt(WORD addr);
 
 // Salva uma entrada de diretório no disco e retorna o endereço
-WORD writeDirEnt(DIRENT2 *ent);
+WORD writeDirEnt(DIRENTRY *ent);
 
 // Escreve em um bloco de dados do disco
 int writeData(WORD block, void *data, int size);
@@ -57,12 +128,22 @@ void* readData(WORD block, int size);
 int createRootDir();
 
 // Quebra uma pathstring em uma sequencia de caminhos relativos
-char** decodePath(char* path);
+char** decodePath(char* path, int *count);
 
 FILE2 getFreeFileHandle();
 
 char* getCWD();
 
 FILE2 createFile(char *name);
+
+DIR2 createDir(char *pathname);
+
+int readDir(DIR2 handle, DIRENT2 *dentry);
+
+DIR2 openDirectory(char *pathname);
+
+int changeDirectory(char *pathname);
+
+char *toAbsolutePath(char *path);
 
 #endif

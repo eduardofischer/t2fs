@@ -5,18 +5,6 @@
 
 #define	INVALID_PTR	-1
 
-#define WORKING_PART 0 // Partição utilizada pelo FS
-#define FILE_NAME_MAX_LENGTH 31+1
-#define MAX_NUMBER_FILES 64
-
-#define FAT_FREE_CHAR 0xFFFFFFFF
-#define FAT_LAST_BLOCK_CHAR 0xDDDDDDDD
-#define BITMAP_FREE_CHAR 0xEE
-#define BITMAP_TAKEN_CHAR 0xAA
-
-#define REGULAR_FT 0x01
-#define DIRECTORY_FT 0x02
-
 typedef int FILE2;
 typedef int DIR2;
 
@@ -28,66 +16,11 @@ typedef unsigned int DWORD;
 
 #pragma pack(push, 1)
 
-// Open Files
-typedef struct {
-	int pointer;
-	int firstBlock;
-	int block;
-} OFILE;
-
-OFILE openFiles[20];
-
-// Open Directories
-typedef struct {
-	int readCount;
-	int block;
-} ODIR;
-
-ODIR openDirs[20];
-
-// Partition Table Entry
-typedef struct {
-	DWORD	startAddress;
-	DWORD	endAddress;
-	BYTE 	name[24];
-} PARTTE;
-
-// Master Boot Record data
-typedef struct {
-    WORD	diskVersion;
-    WORD	sectorSize;
-    WORD	partitionTableStart;
-    WORD	numberPartitions;
-	PARTTE	partition[4];
-} MBR;
-
-MBR diskMBR;
-
-// Superblock
-typedef struct {
-    WORD	sectorsPerBlock;
-    WORD	fatStart;
-    WORD	fatSize;
-    WORD    entDirAreaStart;
-    WORD    entDirAreaSize; // Número de setores reservados para armazenamento de ENTDIR2 (Entradas de diretório)
-	WORD	dataBlocksAreaStart; // Início da área de blocos de dados
-	WORD 	dataBlocksAreaSize;
-	WORD 	numberOfDataBlocks;
-	WORD	hashTableSize;
-	BYTE	cwdHandle;
-	char 	*cwdPath;
-} SUPERBLOCK;
-
-SUPERBLOCK superBlock;
-
 /** Registro com as informa��es da entrada de diret�rio, lida com readdir2 */
 typedef struct {
     char    name[MAX_FILE_NAME_SIZE+1]; /* Nome do arquivo cuja entrada foi lida do disco      */
     BYTE    fileType;                   /* Tipo do arquivo: regular (0x01) ou diret�rio (0x02) */
     DWORD   fileSize;                   /* Numero de bytes do arquivo                      */
-
-	WORD	firstBlock; // Primeiro bloco de dados do arquivo [regular] ou bloco do diretório
-	WORD   	next;		// Ponteiro para a próxima entrada (Linked List) ENDEREÇO NO DISCO
 } DIRENT2;
 
 #pragma pack(pop)
