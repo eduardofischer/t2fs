@@ -139,7 +139,9 @@ FILE2 getFreeFileHandle();
 
 char* getCWD();
 
-FILE2 createFile(char *name);
+DWORD getDirTableBlock(char *pathname, int parent, char *filename);
+
+FILE2 createFile(char *pathname);
 
 DIR2 createDir(char *pathname);
 
@@ -164,5 +166,9 @@ int seek(FILE2 handle, DWORD offset);
 int truncateFile(FILE2 handle);
 
 int closeFile(FILE2 handle);
+
+int freeAllFileBlocks(DWORD firstAddr);
+
+int deleteFile(char *pathname);
 
 #endif

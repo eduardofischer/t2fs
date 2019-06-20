@@ -72,7 +72,6 @@ int updateHashEntry(DIRENTRY *table, DIRENTRY *file){
 
     // Caso esteja armazenada em Linked List
     while(it->next != (BYTE)INVALID_PTR) {
-        printf("Preso aqui\n");
         DIRENTRY *next = readDirEnt(it->next);
         saveAddr = it->next;
         memcpy(it, next, sizeof(DIRENTRY));

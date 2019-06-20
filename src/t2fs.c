@@ -63,7 +63,7 @@ int delete2 (char *filename) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return deleteFile(filename);
 }
 
 /*-----------------------------------------------------------------------------
