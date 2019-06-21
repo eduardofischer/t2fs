@@ -212,7 +212,7 @@ int closedir2 (DIR2 handle) {
 	if(hasInit < 0)
 		if(initFS() != 0) return -1;
 
-	return -1;
+	return closeDirectory(handle);
 }
 
 /*-----------------------------------------------------------------------------
