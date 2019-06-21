@@ -104,6 +104,9 @@ int initFS(){
 
     memcpy(&superBlock, buffer, sizeof(SUPERBLOCK));
 
+    superBlock.cwdHandle = 0;
+    strcpy(superBlock.cwdPath, "/");
+
     initOpenStructs();
 
     hasInit = 1;
@@ -368,13 +371,17 @@ int createRootDir(){
     DIRENTRY *table = createDirTable();
     DIRENTRY *this = malloc(sizeof(DIRENTRY));
     
-    // Entrada .
-    strcpy((char *)this, ".");
+    // Entrada ..
+    strcpy((char *)this, "..");
     this->fileType = DIRECTORY_FT;
     this->fileSize = sizeof(DIRENTRY) * superBlock.hashTableSize;
     this->firstBlock = 0;
     this->next = INVALID_PTR;
 
+    insertHashEntry(table, this);
+
+    // Entrada .
+    strcpy((char *)this, ".");
     insertHashEntry(table, this);
 
     if(writeData(0, table, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
@@ -469,7 +476,7 @@ FILE2 createFile(char *pathname){
         return -1;
 
     if((strcmp(pathname, "/") | strcmp(pathname, ".") | strcmp(pathname, "..")) == 0)
-        return -1;
+        return -4;
 
     strcpy((char*)&(newFile.name), name);
     newFile.pointer = 0;
@@ -486,8 +493,12 @@ FILE2 createFile(char *pathname){
 
     setFAT(addr, FAT_LAST_BLOCK_CHAR);
 
-    if(insertHashEntry(dirTable, dirEntry) != 0)
-        return -2; // Caso o arquivo já exista [FALTA IMPLEMENTAR]
+    if(insertHashEntry(dirTable, dirEntry) != 0){      
+        if(deleteFile(pathname) == 0)
+            return createFile(pathname);         
+        else
+            return -2;
+    }
 
     if(writeData(dirTableAddr, dirTable, sizeof(DIRENTRY) * superBlock.hashTableSize) != 0)
         return -3;
@@ -872,7 +883,7 @@ int removeDirectory(char *pathname){
     char **branch = decodePath(pathname, &branchLength);
     DIRENTRY *dirTable, *dir;
     DIR2 dirHandle;
-    WORD parentDir;
+    WORD parentDir = openDirs[superBlock.cwdHandle].block;
     int i;
 
     if(branchLength == 1 && (strcmp(branch[0], "/") && strcmp(branch[0], ".") && strcmp(branch[0], "..")) == 0)
@@ -895,14 +906,14 @@ int removeDirectory(char *pathname){
 
             // Caso o diretório seja inválido
             if(dir == NULL || dir->fileType != DIRECTORY_FT)
-                return -1;
+                return -6;
 
             dirHandle = loadDirHandle(*dir);
             if(dirHandle < 0)
-                return -2;    
+                return -7;    
 
             if(openDirs[dirHandle].block == INVALID_PTR)
-                return -2;
+                return -8;
 
             dirTable = (DIRENTRY*)readData(openDirs[dirHandle].block, sizeof(DIRENTRY) * superBlock.hashTableSize);
             parentDir = openDirs[dirHandle].block;
@@ -916,11 +927,13 @@ int removeDirectory(char *pathname){
 
     dir = findHashEntry(dirTable, branch[i]);
 
-    // Verificar se o diretório está vazio
-
     // Caso o diretório seja inválido
     if(dir == NULL || dir->fileType != DIRECTORY_FT)
         return -1;
+
+    // Verifica se o diretório está vazio
+    if(getNthEntry(dirTable, 3) != NULL)
+        return -2;
 
     if(isDirOpen(*dir) == 0)
         return -3; // Erro: diretório aberto
@@ -1096,7 +1109,7 @@ int readFile(FILE2 handle, char *buffer, int size){
         else
             readSize = blockSize - offset;
 
-        if((file->pointer - startPointer) + readSize > file->size)
+        if((file->pointer - startPointer) + readSize > file->size - file->pointer)
             readSize = file->size - file->pointer;
         
         memcpy(buffer, blockBuffer + offset, readSize);
