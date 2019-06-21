@@ -662,6 +662,10 @@ int closeDirectory(DIR2 handle){
     return 0;
 }
 
+int closeDir(DIR2 handle){
+    return 0;
+}
+
 int closeAllDirectories(){
     int d;
     int nOpenDirs = sizeof(openDirs) / sizeof(ODIR);

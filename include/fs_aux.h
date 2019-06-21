@@ -145,7 +145,7 @@ FILE2 createFile(char *pathname);
 
 DIR2 createDir(char *pathname);
 
-int closeDirectory(DIR2 handle);
+int closeDir(DIR2 handle);
 
 int readDir(DIR2 handle, DIRENT2 *dentry);
 
